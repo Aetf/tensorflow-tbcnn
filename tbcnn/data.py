@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 from builtins import open, super, object
+import six
 
 import pickle
 
@@ -11,12 +12,20 @@ class Node(object):
         self.type = ''
 
 
-class NodeUnpickler(pickle.Unpickler):
-    def find_class(self, module, name):
-        if module == '__main__' and name == 'Node':
-            return Node
-        else:
-            return super(NodeUnpickler, self).find_class(module, name)
+if six.PY2:
+    class NodeUnpickler(pickle.Unpickler, object):
+        def find_class(self, module, name):
+            if module == '__main__' and name == 'Node':
+                return Node
+            else:
+                return super().find_class(module, name)
+else:
+    class NodeUnpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if module == '__main__' and name == 'Node':
+                return Node
+            else:
+                return super().find_class(module, name)
 
 
 def node2dic(node, word2int):
