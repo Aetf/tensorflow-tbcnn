@@ -9,7 +9,7 @@ import tensorflow_fold as td
 import numpy as np
 
 from tbcnn import embedding
-from tbcnn.config import change_hyper
+from tbcnn.config import hyper
 from tbcnn.data import load as data_load
 
 
@@ -27,7 +27,9 @@ def linear_combine_np(clen, pclen, idx, Wl, Wr):
 class TestEmbedding(unittest.TestCase):
 
     def setUp(self):
-        change_hyper(word_dim=3)
+        tf.reset_default_graph()
+
+        hyper.initialize(from_cmd=False, word_dim=3)
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())

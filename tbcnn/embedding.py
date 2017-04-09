@@ -182,9 +182,10 @@ def write_embedding_metadata(writer, word2int):
 
 
 def main():
-    tree_sum = tree_sum_blk(l2loss_blk)
+    hyper.initialize()
 
     # Compile the block
+    tree_sum = tree_sum_blk(l2loss_blk)
     compiler = td.Compiler.create(tree_sum)
     (batched_loss, ) = compiler.output_tensors
     loss = tf.reduce_mean(batched_loss)
