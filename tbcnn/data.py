@@ -1,5 +1,5 @@
-from __future__ import absolute_import, division, print_function
-from builtins import (open, super, object)
+from __future__ import absolute_import, division, print_function, unicode_literals
+from builtins import open, super, object
 
 import pickle
 
@@ -16,7 +16,7 @@ class NodeUnpickler(pickle.Unpickler):
         if module == '__main__' and name == 'Node':
             return Node
         else:
-            return super().find_class(module, name)
+            return super(NodeUnpickler, self).find_class(module, name)
 
 
 def node2dic(node, word2int):
