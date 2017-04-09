@@ -1,7 +1,5 @@
 from __future__ import absolute_import, division, print_function
 
-import numpy as np
-
 import tensorflow as tf
 import tensorflow_fold as td
 
@@ -75,8 +73,8 @@ def continous_weighted_add_blk():
             td.Function(lambda a, b: tf.squeeze(tf.add(a, b), axis=1),
                         name='add_last_weighted_fea').reads(last, weighted_fea),
             # XXX: rewrite using tf.range
-            td.Function(tf.add, name='add_idx_1').reads(
-                idx, td.FromTensor(np.array(1., dtype='float32')))
+            td.Function(tf.add, name='add_idx_1').reads(idx,
+                                                        td.FromTensor(tf.constant(1.)))
         )
     return block
 
@@ -164,12 +162,10 @@ def main():
 
         tf.summary.FileWriter('./tf_graph', graph=sess.graph)
         for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
-            train_loss = 0.0
             for batch in td.group_by_batches(shuffled, hyper.batch_size):
                 train_feed_dict = {compiler.loom_input_tensor: batch}
                 _, batch_loss = sess.run([train_step, loss], train_feed_dict)
                 print(batch_loss)
-                train_loss += np.sum(batch_loss)
 
 
 if __name__ == '__main__':
