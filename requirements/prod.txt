@@ -1,0 +1,5 @@
+numpy==1.12.1
+tensorflow==1.0.0
+tensorflow-fold==0.0.1
+Cython==0.25.2
+ddt==1.1.1
