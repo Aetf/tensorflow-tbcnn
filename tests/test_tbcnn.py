@@ -10,7 +10,7 @@ import numpy as np
 
 from tbcnn import embedding
 from tbcnn.config import change_hyper
-from tbcnn.data import word2int
+from tbcnn.data import load as data_load
 
 
 def linear_combine_np(clen, pclen, idx, Wl, Wr):
@@ -35,9 +35,19 @@ class TestEmbedding(unittest.TestCase):
     def tearDown(self):
         self.sess.close()
 
+    def _load_test_data(self):
+        nodes, word2int = data_load('data/tests.obj')
+        return nodes[0], word2int
+
+    def _get_leaf(self, root):
+        for c in root['children']:
+            return self._get_leaf(c)
+        return root
+
     @unpack
     @data([1., 1., 0.], [1., 3., 0.], [2., 3., 1.], [0., 3., 2.])
     def test_linear_combine(self, clen, pclen, idx):
+        """Test linear_combine_blk on data"""
         Wl = self.sess.run(embedding.param.get('Wl'))
         Wr = self.sess.run(embedding.param.get('Wr'))
 
@@ -47,35 +57,43 @@ class TestEmbedding(unittest.TestCase):
         desired = linear_combine_np(clen, pclen, idx, Wl, Wr)
         nptest.assert_allclose(actual, desired)
 
-    def test_direct_embed(self):
-        leaf = {'childcase': 0, 'children': [], 'clen': 0, 'name': 'String'}
+    def test_direct_embed_leaf(self):
+        """Test direct_embed_blk on leaf node"""
+        root, _ = self._load_test_data()
+        leaf = self._get_leaf(root)
 
         actual = embedding.direct_embed_blk().eval(leaf, session=self.sess)
 
-        idx = word2int[leaf['name']]
-        desired = embedding.param.get_embedding().weights.eval(session=self.sess)[idx, :]
+        # must goes after actual, otherwise weights are not created yet
+        we = embedding.param.get_embedding().weights.eval(session=self.sess)
+        desired = we[leaf['name'], :]
+
+        nptest.assert_allclose(actual, desired)
+
+    def test_direct_embed_nonleaf(self):
+        """Test direct_embed_blk on nonleaf node"""
+        root, _ = self._load_test_data()
+
+        actual = embedding.direct_embed_blk().eval(root, session=self.sess)
+
+        # must goes after actual, otherwise weights are not created yet
+        we = embedding.param.get_embedding().weights.eval(session=self.sess)
+        desired = we[root['name'], :]
 
         nptest.assert_allclose(actual, desired)
 
     def test_composed_embed(self):
-        lv3 = {'childcase': 2,
-               'children': [{'childcase': 1, 'children':
-                             [{'childcase': 0, 'children': [], 'clen': 0, 'name': 'String'}],
-                             'clen': 1, 'name': 'ColumnRef'},
-                            {'childcase': 0, 'children': [],
-                             'clen': 0, 'name': 'String'},
-                            {'childcase': 1, 'children':
-                             [{'childcase': 0, 'children': [], 'clen': 0, 'name': 'Integer'}],
-                             'clen': 1, 'name': 'A_Const'}], 'clen': 3, 'name': 'A_Expr'}
+        root, _ = self._load_test_data()
+
         Wl = embedding.param.get('Wl').eval(session=self.sess)
         Wr = embedding.param.get('Wr').eval(session=self.sess)
         B = embedding.param.get('B').eval(session=self.sess)
 
-        actual = embedding.composed_embed_blk().eval(lv3, session=self.sess)
+        actual = embedding.composed_embed_blk().eval(root, session=self.sess)
 
-        pclen = lv3['clen']
+        pclen = root['clen']
         desired = np.zeros_like(actual)
-        for idx, c in enumerate(lv3['children']):
+        for idx, c in enumerate(root['children']):
             weight = linear_combine_np(c['clen'], pclen, idx, Wl, Wr)
             fc = embedding.direct_embed_blk().eval(c, session=self.sess)
             desired += np.matmul(fc, weight)
@@ -85,21 +103,29 @@ class TestEmbedding(unittest.TestCase):
         nptest.assert_allclose(actual, desired)
 
     def test_l2loss(self):
-        lv3 = {'childcase': 2,
-               'children': [{'childcase': 1, 'children':
-                             [{'childcase': 0, 'children': [], 'clen': 0, 'name': 'String'}],
-                             'clen': 1, 'name': 'ColumnRef'},
-                            {'childcase': 0, 'children': [],
-                             'clen': 0, 'name': 'String'},
-                            {'childcase': 1, 'children':
-                             [{'childcase': 0, 'children': [], 'clen': 0, 'name': 'Integer'}],
-                             'clen': 1, 'name': 'A_Const'}], 'clen': 3, 'name': 'A_Expr'}
+        root, _ = self._load_test_data()
 
-        actual = embedding.l2loss_blk().eval(lv3, session=self.sess)
+        actual = embedding.l2loss_blk().eval(root, session=self.sess)
 
-        direct = embedding.direct_embed_blk().eval(lv3, session=self.sess)
-        com = embedding.composed_embed_blk().eval(lv3, session=self.sess)
+        direct = embedding.direct_embed_blk().eval(root, session=self.sess)
+        com = embedding.composed_embed_blk().eval(root, session=self.sess)
         desired = tf.nn.l2_loss(direct - com).eval(session=self.sess)
+
+        nptest.assert_allclose(actual, desired)
+
+    def test_tree_sum(self):
+        root, _ = self._load_test_data()
+        actual = embedding.tree_sum_blk(embedding.l2loss_blk).eval(root, session=self.sess)
+
+        loss = embedding.l2loss_blk()
+
+        def traverse(root):
+            running_total = loss.eval(root, session=self.sess)
+            for c in root['children']:
+                running_total += traverse(c)
+            return running_total
+
+        desired = traverse(root)
 
         nptest.assert_allclose(actual, desired)
 

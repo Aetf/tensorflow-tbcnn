@@ -13,8 +13,8 @@ def find_leaf(root):
 sess = tf.InteractiveSession()
 sess.run(tf.global_variables_initializer())
 
-direct = direct_embed()
-com = composed_embed()
+direct = direct_embed_blk()
+com = composed_embed_blk()
 
 Wl = sess.run(param.get('Wl'))
 Wr = sess.run(param.get('Wr'))
@@ -27,3 +27,4 @@ c2 = root['children'][1]
 
 leaf = find_leaf(root)
 lv2 = root['children'][0]['children'][0]['children'][0]
+lv3 = root['children'][0]['children'][0]

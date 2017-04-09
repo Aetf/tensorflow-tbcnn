@@ -3,8 +3,8 @@ from __future__ import absolute_import, division, print_function
 import tensorflow as tf
 import tensorflow_fold as td
 
-from .config import param, hyper
 from . import data
+from .config import hyper, param
 
 
 def linear_combine(clen, pclen, idx):
@@ -80,7 +80,7 @@ def continous_weighted_add_blk():
 
 
 def direct_embed_blk():
-    return (td.InputTransform(lambda node: data.word2int[node['name']]) >> td.Scalar('int32')
+    return (td.GetItem('name') >> td.Scalar('int32')
             >> td.Function(param.get_embedding()))
 
 
@@ -133,12 +133,12 @@ def l2loss_blk():
                     {False: leaf_case, True: nonleaf_case})
 
 
-def main():
+def tree_sum_blk(loss_blk):
     # traverse the tree to sum up the loss
     tree_sum_fwd = td.ForwardDeclaration(td.PyObjectType(), td.TensorType([]))
     tree_sum = td.Composition()
     with tree_sum.scope():
-        myloss = l2loss_blk().reads(tree_sum.input)
+        myloss = loss_blk().reads(tree_sum.input)
         children = td.GetItem('children').reads(tree_sum.input)
 
         mapped = td.Map(tree_sum_fwd()).reads(children)
@@ -146,21 +146,26 @@ def main():
         summed = td.Function(tf.add).reads(summed, myloss)
         tree_sum.output.reads(summed)
     tree_sum_fwd.resolve_to(tree_sum)
+    return tree_sum
+
+
+def main():
+    tree_sum = tree_sum_blk(l2loss_blk)
 
     # Compile the block
     compiler = td.Compiler.create(tree_sum)
-    loss = compiler.output_tensors
-    train_step = tf.train.AdamOptimizer(learning_rate=0.2).minimize(loss)
+    (loss, ) = compiler.output_tensors
+    train_step = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate).minimize(loss)
 
     # load data node to record
-    nodes = data.load()
+    nodes, word2int = data.load()
 
     # train loop
     train_set = compiler.build_loom_inputs(nodes)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        tf.summary.FileWriter('./tf_graph', graph=sess.graph)
+        tf.summary.FileWriter('/tmp/workspace/tf_graph', graph=sess.graph)
         for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
             for batch in td.group_by_batches(shuffled, hyper.batch_size):
                 train_feed_dict = {compiler.loom_input_tensor: batch}
