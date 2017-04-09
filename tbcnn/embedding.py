@@ -1,7 +1,13 @@
 from __future__ import absolute_import, division, print_function
 
+import os
+import operator
+from datetime import datetime
+from timeit import default_timer
+
 import tensorflow as tf
 import tensorflow_fold as td
+from tensorflow.contrib.tensorboard.plugins import projector
 
 from . import data
 from .config import hyper, param
@@ -79,9 +85,14 @@ def continous_weighted_add_blk():
     return block
 
 
+def clip_by_norm_blk(norm=1.0):
+    return td.Function(lambda x: tf.clip_by_norm(x, norm, axes=[1]))
+
+
 def direct_embed_blk():
     return (td.GetItem('name') >> td.Scalar('int32')
-            >> td.Function(param.get_embedding()))
+            >> td.Function(param.get_embedding())
+            >> clip_by_norm_blk())
 
 
 def composed_embed_blk():
@@ -102,7 +113,8 @@ def composed_embed_blk():
         summed = td.Zip().reads(fchildren, cclens, td.Broadcast().reads(clen))
         summed = td.Fold(continous_weighted_add_blk(), initial_state).reads(summed)[0]
         added = td.Function(tf.add, name='add_bias').reads(summed, td.FromTensor(param.get('B')))
-        relu = td.Function(tf.nn.relu).reads(added)
+        normed = clip_by_norm_blk().reads(added)
+        relu = td.Function(tf.nn.relu).reads(normed)
         nonleaf_case.output.reads(relu)
 
     return td.OneOf(lambda node: node['clen'] == 0,
@@ -149,28 +161,82 @@ def tree_sum_blk(loss_blk):
     return tree_sum
 
 
+def write_embedding_metadata(writer, word2int):
+    metadata_path = os.path.join(hyper.train_dir, 'embedding_meta.tsv')
+    # dump embedding mapping
+    items = sorted(word2int.items(), key=operator.itemgetter(1))
+    with open(metadata_path, 'w') as f:
+        for item in items:
+            print(item[0], file=f)
+
+    config = projector.ProjectorConfig()
+    config.model_checkpoint_dir = hyper.train_dir
+    embedding = config.embeddings.add()
+    embedding.tensor_name = param.get_embedding().name
+    # Link this tensor to its metadata file (e.g. labels).
+    embedding.metadata_path = metadata_path
+    # Saves a configuration file that TensorBoard will read during startup.
+    projector.visualize_embeddings(writer, config)
+
+
 def main():
     tree_sum = tree_sum_blk(l2loss_blk)
 
     # Compile the block
     compiler = td.Compiler.create(tree_sum)
-    (loss, ) = compiler.output_tensors
-    train_step = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate).minimize(loss)
+    (batched_loss, ) = compiler.output_tensors
+    loss = tf.reduce_mean(batched_loss)
+    opt = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate)
+
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+    train_step = opt.minimize(loss, global_step=global_step)
+
+    print('All trainable variables:')
+    for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
+        print(v.name, v)
+
+    # Attach summaries
+    tf.summary.histogram('Wl', param.get('Wl'))
+    tf.summary.histogram('Wr', param.get('Wr'))
+    tf.summary.histogram('B', param.get('B'))
+    tf.summary.histogram('Embedding', param.get_embedding().weights)
+    tf.summary.scalar('loss', loss)
+
+    summary_op = tf.summary.merge_all()
 
     # load data node to record
-    nodes, word2int = data.load()
+    nodes, word2int = data.load('data/nodes.obj')
+    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
+    nodes = nodes + nodes_valid
+
+    # create missing dir
+    if not os.path.exists(hyper.train_dir):
+        os.makedirs(hyper.train_dir)
 
     # train loop
+    saver = tf.train.Saver()
     train_set = compiler.build_loom_inputs(nodes)
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
-        tf.summary.FileWriter('/tmp/workspace/tf_graph', graph=sess.graph)
+        summary_writer = tf.summary.FileWriter(hyper.log_dir, graph=sess.graph)
+        write_embedding_metadata(summary_writer, word2int)
+
         for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
-            for batch in td.group_by_batches(shuffled, hyper.batch_size):
+            for step, batch in enumerate(td.group_by_batches(shuffled, hyper.batch_size), 1):
                 train_feed_dict = {compiler.loom_input_tensor: batch}
-                _, batch_loss = sess.run([train_step, loss], train_feed_dict)
-                print(batch_loss)
+
+                start_time = default_timer()
+                _, loss_value, summary, gstep = sess.run([train_step, loss, summary_op, global_step], train_feed_dict)
+                duration = default_timer() - start_time
+
+                print('{}: global {} epoch {}, step {}, loss = {:.2f} ({:.1f} samples/sec; {:.3f} sec/batch)'
+                      .format(datetime.now(), gstep, epoch, step, loss_value,
+                              hyper.batch_size / duration, duration))
+                if gstep % 10 == 0:
+                    summary_writer.add_summary(summary, gstep)
+                if gstep % 100 == 0:
+                    saver.save(sess, os.path.join(hyper.train_dir, "model.ckpt"), global_step=gstep)
 
 
 if __name__ == '__main__':

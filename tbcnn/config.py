@@ -7,12 +7,15 @@ import tensorflow_fold as td
 # Hyper parameters
 class hyper(object):
     # shapes
-    word_dim = 10  # dimension of the feature vector for each node
+    word_dim = 40  # dimension of the feature vector for each node
     node_type_num = 20  # total number of node types
     # learning
-    learning_rate = 0.2  # learning rate
-    batch_size = 30
-    num_epochs = 5
+    learning_rate = 0.0002  # learning rate
+    batch_size = 128
+    num_epochs = 50
+    # directories
+    log_dir = '/tmp/workspace/tf_log'
+    train_dir = '/tmp/workspace/tf_log'
 
 
 # weights management

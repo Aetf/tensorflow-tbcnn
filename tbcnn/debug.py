@@ -20,7 +20,7 @@ Wl = sess.run(param.get('Wl'))
 Wr = sess.run(param.get('Wr'))
 B = sess.run(param.get('B'))
 
-root = data.load()[0]
+root = data.load()[0][0]
 c1 = root['children'][0]
 c2 = root['children'][1]
 

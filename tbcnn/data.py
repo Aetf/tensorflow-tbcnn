@@ -37,12 +37,13 @@ def node2dic(node, word2int):
     return dic
 
 
-def load(filename=None):
+def load(filename=None, word2int=None):
     if filename is None:
         filename = 'data/nodes.obj'
     with open(filename, 'rb') as f:
         nodes = NodeUnpickler(f).load()
 
-    word2int = {}
+    if word2int is None:
+        word2int = {}
     nodes = [node2dic(n, word2int) for n in nodes]
     return nodes, word2int
