@@ -93,7 +93,7 @@ def clip_by_norm_blk(norm=1.0):
 
 def direct_embed_blk():
     return (td.GetItem('name') >> td.Scalar('int32')
-            >> td.Function(param.get_embedding())
+            >> td.Function(lambda x: tf.nn.embedding_lookup(param.get('We'), x))
             >> clip_by_norm_blk())
 
 
@@ -174,7 +174,7 @@ def write_embedding_metadata(writer, word2int):
     config = projector.ProjectorConfig()
     config.model_checkpoint_dir = hyper.train_dir
     embedding = config.embeddings.add()
-    embedding.tensor_name = param.get_embedding().name
+    embedding.tensor_name = param.get('We').name
     # Link this tensor to its metadata file (e.g. labels).
     embedding.metadata_path = metadata_path
     # Saves a configuration file that TensorBoard will read during startup.
@@ -182,7 +182,10 @@ def write_embedding_metadata(writer, word2int):
 
 
 def main():
-    hyper.initialize()
+    hyper.initialize(variable_scope='embedding')
+
+    # create model variables
+    param.initialize_embedding_weights()
 
     # Compile the block
     tree_sum = tree_sum_blk(l2loss_blk)
@@ -194,15 +197,11 @@ def main():
     global_step = tf.Variable(0, trainable=False, name='global_step')
     train_step = opt.minimize(loss, global_step=global_step)
 
-    print('All trainable variables:')
-    for v in tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES):
-        print(v.name, v)
-
     # Attach summaries
     tf.summary.histogram('Wl', param.get('Wl'))
     tf.summary.histogram('Wr', param.get('Wr'))
     tf.summary.histogram('B', param.get('B'))
-    tf.summary.histogram('Embedding', param.get_embedding().weights)
+    tf.summary.histogram('Embedding', param.get('We'))
     tf.summary.scalar('loss', loss)
 
     summary_op = tf.summary.merge_all()

@@ -20,6 +20,8 @@ class hyper(object):
     # directories
     log_dir = '/tmp/workspace/tf_log'
     train_dir = '/tmp/workspace/tf_log'
+    # variables
+    variable_scope = ''
 
     @classmethod
     def initialize(clz, from_cmd=True, **kwargs):
@@ -51,49 +53,27 @@ class hyper(object):
         for k, v in kwargs.items():
             setattr(clz, k, v)
 
-        param._param = _paramobj()
-
 
 # weights management
-class _paramobj(object):
-    def __init__(self):
-        self.weights = {}
-        self.embedding_layer = None
-        self.initialize()
-
-    def create_variable(self, name, shape, initializer, dtype=tf.float32):
-        self.weights[name] = tf.Variable(initializer(shape, dtype), name=name)
-
-    def __getitem__(self, name):
-        return self.weights[name]
-
-    def initialize(self):
-        self.create_variable('Wl', (hyper.word_dim, hyper.word_dim),
-                             tf.random_uniform_initializer(-.2, .2))
-        self.create_variable('Wr', (hyper.word_dim, hyper.word_dim),
-                             tf.random_uniform_initializer(-.2, .2))
-        self.create_variable('B', (hyper.word_dim,),
-                             tf.random_uniform_initializer(-.2, .2))
-        self.create_variable('We', (hyper.node_type_num, hyper.word_dim),
-                             tf.random_uniform_initializer(-.2, .2))
-
-    def get_embedding(self):
-        if self.embedding_layer is None:
-            self.embedding_layer = td.Embedding(hyper.node_type_num, hyper.word_dim)
-        return self.embedding_layer
-
-
 class param(object):
-    _param = None
-
     @classmethod
-    def create_variable(clz, *args, **kwargs):
-        return clz._param.create_variable(*args, **kwargs)
-
-    @classmethod
-    def get_embedding(clz):
-        return clz._param.get_embedding()
+    def create_variable(clz, name, shape, initializer, dtype=tf.float32, trainable=True):
+        with tf.variable_scope(hyper.variable_scope):
+            return tf.get_variable(name, shape=shape, dtype=dtype,
+                                   trainable=trainable, initializer=initializer)
 
     @classmethod
     def get(clz, name):
-        return clz._param[name]
+        with tf.variable_scope(hyper.variable_scope, reuse=True):
+            return tf.get_variable(name)
+
+    @classmethod
+    def initialize_embedding_weights(clz):
+        clz.create_variable('Wl', (hyper.word_dim, hyper.word_dim),
+                            tf.random_uniform_initializer(-.2, .2))
+        clz.create_variable('Wr', (hyper.word_dim, hyper.word_dim),
+                            tf.random_uniform_initializer(-.2, .2))
+        clz.create_variable('B', (hyper.word_dim,),
+                            tf.random_uniform_initializer(-.2, .2))
+        clz.create_variable('We', (hyper.node_type_num, hyper.word_dim),
+                            tf.random_uniform_initializer(-.2, .2))

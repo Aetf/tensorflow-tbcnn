@@ -9,7 +9,6 @@ import tensorflow_fold as td
 import numpy as np
 
 from tbcnn import embedding
-from tbcnn.config import hyper
 from tbcnn.data import load as data_load
 
 
@@ -29,7 +28,8 @@ class TestEmbedding(unittest.TestCase):
     def setUp(self):
         tf.reset_default_graph()
 
-        hyper.initialize(from_cmd=False, word_dim=3)
+        embedding.hyper.initialize(from_cmd=False, word_dim=3)
+        embedding.param.initialize_embedding_weights()
 
         self.sess = tf.Session()
         self.sess.run(tf.global_variables_initializer())
@@ -67,7 +67,7 @@ class TestEmbedding(unittest.TestCase):
         actual = embedding.direct_embed_blk().eval(leaf, session=self.sess)
 
         # must goes after actual, otherwise weights are not created yet
-        we = embedding.param.get_embedding().weights.eval(session=self.sess)
+        we = embedding.param.get('We').eval(session=self.sess)
         desired = we[leaf['name'], :]
 
         nptest.assert_allclose(actual, desired)
@@ -79,7 +79,7 @@ class TestEmbedding(unittest.TestCase):
         actual = embedding.direct_embed_blk().eval(root, session=self.sess)
 
         # must goes after actual, otherwise weights are not created yet
-        we = embedding.param.get_embedding().weights.eval(session=self.sess)
+        we = embedding.param.get('We').eval(session=self.sess)
         desired = we[root['name'], :]
 
         nptest.assert_allclose(actual, desired)
