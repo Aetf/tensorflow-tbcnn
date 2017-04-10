@@ -49,6 +49,8 @@ class hyper(object):
             parser.add_argument('--word_dim', help='dimension of node feature', type=int, default=100)
             parser.add_argument('--conv_dim',
                                 help='dimension of conv feature detectors', type=int, default=50)
+            parser.add_argument('--fc_dim',
+                                help='dimension of fc layer', type=int, default=1024)
             parser.add_argument('--output_dim',
                                 help='number of output classes, default to 2. Should not need to change',
                                 type=int, default=2)
