@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from .embedding import *
 
 hyper.initialize()
+param.initialize_embedding_weights()
 
 
 def find_leaf(root):

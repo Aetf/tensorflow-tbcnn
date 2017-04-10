@@ -45,7 +45,8 @@ def linear_combine(clen, pclen, idx):
 
 def batch_mul(batch, weight):
     batch = tf.expand_dims(batch, axis=1)
-    return tf.matmul(batch, weight)
+    mul = tf.matmul(batch, weight)
+    return tf.squeeze(mul, axis=1)
 
 
 def expand_dim_blk(axis):
@@ -65,7 +66,6 @@ def continous_weighted_add_blk():
         cur = td.GetItem(1).reads(block.input)
 
         last = td.GetItem(0).reads(initial)
-        last = expand_dim_blk(axis=1).reads(last)
         idx = td.GetItem(1).reads(initial)
 
         cur_fea = td.GetItem(0).reads(cur)
@@ -75,14 +75,11 @@ def continous_weighted_add_blk():
         Wi = linear_combine_blk().reads(cur_clen, pclen, idx)
 
         weighted_fea = td.Function(batch_mul).reads(cur_fea, Wi)
-        weighted_fea.set_output_type(td.TensorType([1, hyper.word_dim]))
 
         block.output.reads(
-            td.Function(lambda a, b: tf.squeeze(tf.add(a, b), axis=1),
-                        name='add_last_weighted_fea').reads(last, weighted_fea),
+            td.Function(tf.add, name='add_last_weighted_fea').reads(last, weighted_fea),
             # XXX: rewrite using tf.range
-            td.Function(tf.add, name='add_idx_1').reads(idx,
-                                                        td.FromTensor(tf.constant(1.)))
+            td.Function(tf.add, name='add_idx_1').reads(idx, td.FromTensor(tf.constant(1.)))
         )
     return block
 
@@ -147,6 +144,7 @@ def l2loss_blk():
                     {False: leaf_case, True: nonleaf_case})
 
 
+# generalize to tree_reduce, accepts one block that takes two node, returns a value
 def tree_sum_blk(loss_blk):
     # traverse the tree to sum up the loss
     tree_sum_fwd = td.ForwardDeclaration(td.PyObjectType(), td.TensorType([]))
@@ -172,7 +170,7 @@ def write_embedding_metadata(writer, word2int):
             print(item[0], file=f)
 
     config = projector.ProjectorConfig()
-    config.model_checkpoint_dir = hyper.train_dir
+    config.model_checkpoint_dir = hyper.train_dir  # not work yet. TF doesn't support model_checkpoint_dir
     embedding = config.embeddings.add()
     embedding.tensor_name = param.get('We').name
     # Link this tensor to its metadata file (e.g. labels).
