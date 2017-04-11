@@ -130,12 +130,11 @@ def weighted_feature_blk():
     return blk
 
 
-def feature_detector_blk():
+def feature_detector_blk(max_depth=2):
     """Input: node dict
     Output: TensorType([hyper.conv_dim, ])
-    Single patch of the conv. Depth is 2
+    Single patch of the conv. Depth is max_depth
     """
-    max_depth = 2
     blk = td.Composition()
     with blk.scope():
         nodes_in_patch = collect_node_for_conv_patch_blk(max_depth=max_depth).reads(blk.input)

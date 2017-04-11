@@ -85,6 +85,47 @@ class TestTbcnn(unittest.TestCase):
         desired = tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt)
         nptest.assert_allclose(actual, desired)
 
+    def test_weighted_feature(self):
+        root, _ = self._load_test_data()
+        Wconvl = self.sess.run(tbcnn.param.get('Wconvl'))
+        Wconvr = self.sess.run(tbcnn.param.get('Wconvr'))
+        Wconvt = self.sess.run(tbcnn.param.get('Wconvt'))
+        idx, pclen, depth, max_depth = (1., 1., 0., 2.)
+
+        feature = tbcnn.coding_blk().eval(root, session=self.sess)
+
+        actual = (td.Vector(feature.size), td.Scalar(),
+                  td.Scalar(), td.Scalar(), td.Scalar()) >> tbcnn.weighted_feature_blk()
+        actual = actual.eval((feature, idx, pclen, depth, max_depth), session=self.sess)
+
+        desired = np.matmul(feature,
+                            tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt))
+
+        nptest.assert_allclose(actual, desired)
+
+    def test_feature_detector(self):
+        root, _ = self._load_test_data()
+        Wconvl = self.sess.run(tbcnn.param.get('Wconvl'))
+        Wconvr = self.sess.run(tbcnn.param.get('Wconvr'))
+        Wconvt = self.sess.run(tbcnn.param.get('Wconvt'))
+        Bconv = self.sess.run(tbcnn.param.get('Bconv'))
+
+        actual = tbcnn.feature_detector_blk().eval(root, session=self.sess)
+
+        patch = tbcnn.collect_node_for_conv_patch_blk().eval(root, session=self.sess)
+        desired = np.zeros_like(actual)
+        for node, idx, pclen, depth, max_depth in patch:
+            feature = tbcnn.coding_blk().eval(node, session=self.sess)
+            desired += np.matmul(feature,
+                                 tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt))
+        desired += Bconv
+        desired = np.tanh(desired)
+
+        print(actual)
+        print(desired)
+
+        nptest.assert_allclose(actual, desired, rtol=1e-6)
+
 
 if __name__ == '__main__':
     unittest.main()
