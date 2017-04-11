@@ -22,7 +22,7 @@ class hyper(object):
     # directories
     log_dir = '/tmp/workspace/tf_log'
     train_dir = '/tmp/workspace/tf_log'
-    embedding_dir = '/tmp/workspace/embedding_checkpoints'
+    embedding_dir = '/tmp/workspace/embedding_checkpoints/model'
     # variables
     variable_scope = ''
 
@@ -32,10 +32,10 @@ class hyper(object):
             parser = argparse.ArgumentParser()
             parser.add_argument('--embedding_dir',
                                 help="""Saved embedding metrix,
-                                defaults to /tmp/workspace/embedding_checkpoints.
+                                defaults to /tmp/workspace/embedding_checkpoints/model
                                 Only used when train tbcnn.
                                 """,
-                                default='/tmp/workspace/embedding_checkpoints')
+                                default='/tmp/workspace/embedding_checkpoints/model')
             parser.add_argument('--work_dir',
                                 help='directory for saving files, defaults to /tmp/workspace/tf',
                                 default='/tmp/workspace/tflogs')
