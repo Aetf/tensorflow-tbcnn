@@ -202,9 +202,6 @@ def main():
     compiler = td.Compiler.create((tree_pooling, td.Scalar(dtype='int64')))
     (pooled, batched_labels) = compiler.output_tensors
 
-    print('pooled shape', pooled.get_shape())
-    print('batched_label shape', batched_labels.get_shape())
-
     fc1 = tf.nn.relu(tf.add(tf.matmul(pooled, param.get('FC1/weight')), param.get('FC1/bias')))
     fc2 = tf.nn.relu(tf.add(tf.matmul(fc1, param.get('FC2/weight')), param.get('FC2/bias')))
 
@@ -306,6 +303,8 @@ def main():
                     accuracy_value, actual_bsize = sess.run([accuracy, batch_size_op], feed_dict)
                     accumulated_accuracy += accuracy_value * actual_bsize
                     total_size += actual_bsize
+                    print('{}: validation step, accuracy = {:.2f}, current batch = {}, processed = {}'
+                          .format(datetime.now(), accuracy_value, actual_bsize, total_size))
             duration = default_timer() - start_time
             total_accuracy = accumulated_accuracy / total_size
             print('{}: validation acc = {:.2%} ({:.1f} samples/sec)'
