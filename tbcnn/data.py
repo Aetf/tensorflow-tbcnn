@@ -2,6 +2,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from builtins import open, super, object
 import six
 
+import random
 import pickle
 import logging
 
@@ -55,6 +56,7 @@ def load(filename=None, word2int=None):
         filename = 'data/nodes.obj'
     with open(filename, 'rb') as f:
         nodes = NodeUnpickler(f).load()
+    random.shuffle(nodes)
 
     if word2int is None:
         word2int = {}
