@@ -298,8 +298,7 @@ def main():
                     summary_writer.add_summary(summary, gstep)
 
             # do a validation test
-            logger.info('')
-            logger.info('======================= Validation ====================================')
+            logger.info('\n======================= Validation ====================================')
             accumulated_accuracy = 0.
             total_size = 0
             start_time = default_timer()
@@ -312,7 +311,7 @@ def main():
                             accuracy_value, actual_bsize, total_size)
             duration = default_timer() - start_time
             total_accuracy = accumulated_accuracy / total_size
-            logger.info('validation acc = %.2f%% (%.1f samples/sec)',
+            logger.info('validation acc = %.2f%% (%.1f samples/sec; %.2f seconds)',
                         total_accuracy * 100, actual_bsize / duration, duration)
             saved_path = saver.save(sess, os.path.join(hyper.train_dir, "model.ckpt"), global_step=gstep)
             logger.info('validation saved path: %s', saved_path)
