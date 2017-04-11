@@ -65,7 +65,7 @@ class hyper(object):
                                 type=int, default=2)
             parser.add_argument('--node_type_num', help='total number of node types', type=int, default=20)
             parser.add_argument('--use_relu', type=bool, default=False)
-            parser.add_argument('--evaluation', help='Evaluating rather than training', type=bool, default=False)
+            parser.add_argument('--evaluation', help='Evaluating rather than training', action='store_true')
             args = parser.parse_args()
             if not os.path.exists(args.work_dir):
                 os.makedirs(args.work_dir)
