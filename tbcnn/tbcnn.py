@@ -169,7 +169,8 @@ def dynamic_pooling_blk():
     """Input: root node dic
     Output: pooled, TensorType([hyper.conv_dim, ])
     """
-    # traverse the tree to sum up the loss
+    leaf_case = feature_detector_blk()
+
     pool_fwd = td.ForwardDeclaration(td.PyObjectType(), td.TensorType([hyper.conv_dim, ]))
     pool = td.Composition()
     with pool.scope():
@@ -180,6 +181,8 @@ def dynamic_pooling_blk():
         summed = td.Reduce(td.Function(tf.maximum)).reads(mapped)
         summed = td.Function(tf.maximum).reads(summed, cur_fea)
         pool.output.reads(summed)
+    pool = td.OneOf(lambda x: x['clen'] == 0,
+                    {True: leaf_case, False: pool})
     pool_fwd.resolve_to(pool)
     return pool
 

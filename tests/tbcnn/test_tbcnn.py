@@ -22,6 +22,19 @@ def tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt):
     return l * Wconvl + r * Wconvr + t * Wconvt
 
 
+def feature_detector_np(node, Wconvl, Wconvr, Wconvt, Bconv, sess):
+    patch = tbcnn.collect_node_for_conv_patch_blk().eval(node, session=sess)
+
+    desired = np.zeros(tbcnn.hyper.conv_dim)
+    for node, idx, pclen, depth, max_depth in patch:
+        feature = tbcnn.coding_blk().eval(node, session=sess)
+        desired += np.matmul(feature,
+                             tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt))
+    desired += Bconv
+    desired = np.tanh(desired)
+    return desired
+
+
 @ddt
 class TestTbcnn(unittest.TestCase):
 
@@ -112,17 +125,27 @@ class TestTbcnn(unittest.TestCase):
 
         actual = tbcnn.feature_detector_blk().eval(root, session=self.sess)
 
-        patch = tbcnn.collect_node_for_conv_patch_blk().eval(root, session=self.sess)
-        desired = np.zeros_like(actual)
-        for node, idx, pclen, depth, max_depth in patch:
-            feature = tbcnn.coding_blk().eval(node, session=self.sess)
-            desired += np.matmul(feature,
-                                 tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt))
-        desired += Bconv
-        desired = np.tanh(desired)
+        desired = feature_detector_np(root, Wconvl, Wconvr, Wconvt, Bconv, self.sess)
 
-        print(actual)
-        print(desired)
+        nptest.assert_allclose(actual, desired, rtol=1e-6)
+
+    def test_dynamic_pooling(self):
+        root, _ = self._load_test_data()
+        Wconvl = self.sess.run(tbcnn.param.get('Wconvl'))
+        Wconvr = self.sess.run(tbcnn.param.get('Wconvr'))
+        Wconvt = self.sess.run(tbcnn.param.get('Wconvt'))
+        Bconv = self.sess.run(tbcnn.param.get('Bconv'))
+
+        actual = tbcnn.dynamic_pooling_blk().eval(root, session=self.sess)
+
+        def recurse_helper(root, sess):
+            feature = feature_detector_np(root, Wconvl, Wconvr, Wconvt, Bconv, sess)
+            for c in root['children']:
+                cf = recurse_helper(c, sess)
+                feature = np.maximum(feature, cf)
+            return feature
+
+        desired = recurse_helper(root, self.sess)
 
         nptest.assert_allclose(actual, desired, rtol=1e-6)
 
