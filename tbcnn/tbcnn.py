@@ -199,7 +199,7 @@ def main():
 
     # Compile the block and append fc layers
     tree_pooling = dynamic_pooling_blk()
-    compiler = td.Compiler.create((tree_pooling, td.Scalar(dtype='int32')))
+    compiler = td.Compiler.create((tree_pooling, td.Scalar(dtype='int64')))
     (pooled, batched_labels) = compiler.output_tensors
 
     print('pooled shape', pooled.get_shape())
