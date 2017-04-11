@@ -190,17 +190,15 @@ def write_embedding_metadata(writer, word2int):
 
 def main():
     # load data early so we can initialize hyper parameters accordingly
-    nodes, word2int = data.load('data/nodes.obj')
-    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
-    nodes = nodes + nodes_valid
+    ds = data.load_dataset('data/statements')
 
-    apputil.initialize(variable_scope='embedding', node_type_num=len(word2int))
+    apputil.initialize(variable_scope='embedding', node_type_num=len(ds.word2int))
 
     # create model variables
     param.initialize_embedding_weights()
 
     # Compile the block
-    tree_sum = tree_sum_blk(l2loss_blk)
+    tree_sum = td.GetItem(0) >> tree_sum_blk(l2loss_blk)
     compiler = td.Compiler.create(tree_sum)
     (batched_loss, ) = compiler.output_tensors
     loss = tf.reduce_mean(batched_loss)
@@ -224,12 +222,12 @@ def main():
 
     # train loop
     saver = tf.train.Saver()
-    train_set = compiler.build_loom_inputs(nodes)
+    train_set = compiler.build_loom_inputs(ds.get_split('all')[1])
     with tf.Session() as sess:
         sess.run(tf.global_variables_initializer())
 
         summary_writer = tf.summary.FileWriter(hyper.log_dir, graph=sess.graph)
-        write_embedding_metadata(summary_writer, word2int)
+        write_embedding_metadata(summary_writer, ds.word2int)
 
         for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
             for step, batch in enumerate(td.group_by_batches(shuffled, hyper.batch_size), 1):

@@ -1,6 +1,5 @@
 from __future__ import absolute_import, division, print_function
 
-import itertools
 import os
 import logging
 from timeit import default_timer
@@ -190,13 +189,7 @@ def dynamic_pooling_blk():
     return pool
 
 
-def main():
-    # load data early to get node_type_num
-    nodes, word2int = data.load('data/nodes.obj')
-    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
-
-    apputil.initialize(variable_scope='tbcnn', node_type_num=len(word2int))
-
+def build_model():
     # create model variables
     param.initialize_tbcnn_weights()
 
@@ -214,6 +207,10 @@ def main():
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     batch_size_op = tf.unstack(tf.shape(batched_labels))[0]
 
+    return compiler, fc2, logits, batched_labels, accuracy, batch_size_op
+
+
+def train_with_val(unscaled_logits, batched_labels, train_accuracy):
     # calculate weight decay loss
     decay_names = ['Wl', 'Wr', 'Wconvl', 'Wconvr', 'Wconvt']
     decay_loss = tf.reduce_sum(
@@ -221,7 +218,8 @@ def main():
         name='weights_norm')
 
     # Calculate loss and apply optimizer
-    batched_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=fc2, labels=batched_labels)
+    batched_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=unscaled_logits,
+                                                                  labels=batched_labels)
     loss = tf.reduce_mean(batched_loss) + decay_loss
     opt = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate)
 
@@ -237,30 +235,25 @@ def main():
     tf.summary.histogram('Wconvt', param.get('Wconvt'))
     tf.summary.histogram('Bconv', param.get('Bconv'))
     tf.summary.scalar('loss', loss)
+    tf.summary.scalar('train_accuracy', train_accuracy)
     summary_op = tf.summary.merge_all()
 
-    val_summary_op = tf.summary.scalar('val_accuracy', accuracy)
+    return loss, global_step, train_step, summary_op
 
-    # divide into training and validation and testing, and pair with label
-    # label 1 means injection statement
-    # label 0 means benign statement
-    train_frac = 0.6
-    val_frac = 0.2
-    train_len = [int(train_frac * l) for l in [len(nodes), len(nodes_valid)]]
-    val_len = [int(val_frac * l) for l in [len(nodes), len(nodes_valid)]]
-    samples_train = itertools.chain(
-        ((n, 1) for n in nodes[:train_len[0]]),
-        ((n, 0) for n in nodes_valid[:train_len[1]])
-    )
-    samples_val = itertools.chain(
-        ((n, 1) for n in nodes[train_len[0]:train_len[0] + val_len[0]]),
-        ((n, 0) for n in nodes_valid[train_len[1]:train_len[1] + val_len[1]])
-    )
-    # TODO: testing set
-    samples_test = itertools.chain(  # noqa: F841
-        ((n, 1) for n in nodes[train_len[0] + val_len[0]:]),
-        ((n, 0) for n in nodes_valid[train_len[1] + val_len[1]:])
-    )
+
+def do_train():
+    # load data early to get node_type_num
+    ds = data.load_dataset('data/statements')
+
+    apputil.initialize(variable_scope='tbcnn', node_type_num=len(ds.word2int))
+
+    (compiler, unscaled_logits, logits, batched_labels,
+     raw_accuracy, batch_size_op) = build_model()
+
+    (loss, global_step, train_step, summary_op) = train_with_val(unscaled_logits, batched_labels,
+                                                                 raw_accuracy)
+
+    val_summary_op = tf.summary.scalar('val_accuracy', raw_accuracy)
 
     # create missing dir
     if not os.path.exists(hyper.train_dir):
@@ -274,8 +267,8 @@ def main():
 
     # train loop
     saver = tf.train.Saver()
-    train_set = compiler.build_loom_inputs(samples_train)
-    val_set = compiler.build_loom_inputs(samples_val)
+    train_set = compiler.build_loom_inputs(ds.get_split('train')[1])
+    val_set = compiler.build_loom_inputs(ds.get_split('val')[1])
     with tf.Session() as sess:
         # Restore embedding matrix first
         restorer.restore(sess, embedding_path)
@@ -313,7 +306,7 @@ def main():
             start_time = default_timer()
             for batch in td.group_by_batches(val_shuffled, hyper.batch_size):
                 feed_dict = {compiler.loom_input_tensor: batch}
-                accuracy_value, actual_bsize, val_summary = sess.run([accuracy, batch_size_op,
+                accuracy_value, actual_bsize, val_summary = sess.run([raw_accuracy, batch_size_op,
                                                                       val_summary_op], feed_dict)
                 summary_writer.add_summary(val_summary, val_step_counter)
                 accumulated_accuracy += accuracy_value * actual_bsize
@@ -329,6 +322,69 @@ def main():
             logger.info('validation saved path: %s', saved_path)
             logger.info('======================= Validation End =================================')
             logger.info('')
+
+
+def do_evaluation():
+    # load data early to get node_type_num
+    ds = data.load_dataset('data/statements')
+
+    apputil.initialize(variable_scope='tbcnn', node_type_num=len(ds.word2int))
+
+    (compiler, _, _, _,
+     raw_accuracy, batch_size_op) = build_model()
+
+    # restorer for embedding matrix
+    embedding_path = tf.train.latest_checkpoint(hyper.embedding_dir)
+    if embedding_path is None:
+        raise ValueError('Path to embedding checkpoint is incorrect: ' + hyper.embedding_dir)
+
+    # restorer for other variables
+    checkpoint_path = tf.train.latest_checkpoint(hyper.train_dir)
+    if checkpoint_path is None:
+        raise ValueError('Path to tbcnn checkpoint is incorrect: ' + hyper.train_dir)
+
+    restored_vars = tf.get_collection_ref('restored')
+    restored_vars.append(param.get('We'))
+    restored_vars.extend(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+    embeddingRestorer = tf.train.Saver({'embedding/We': param.get('We')})
+    restorer = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES))
+
+    # train loop
+    total_size, test_gen = ds.get_split('test')
+    test_set = compiler.build_loom_inputs(test_gen)
+    with tf.Session() as sess:
+        # Restore embedding matrix first
+        embeddingRestorer.restore(sess, embedding_path)
+        # Restore others
+        restorer.restore(sess, checkpoint_path)
+        # Initialize other variables
+        gvariables = [v for v in tf.global_variables() if v not in tf.get_collection('restored')]
+        sess.run(tf.variables_initializer(gvariables))
+
+        for shuffled in td.epochs(test_set, 1):
+            logger.info('')
+            logger.info('======================= Evaluation ====================================')
+            accumulated_accuracy = 0.
+            start_time = default_timer()
+            for step, batch in enumerate(td.group_by_batches(shuffled, hyper.batch_size), 1):
+                feed_dict = {compiler.loom_input_tensor: batch}
+                accuracy_value, actual_bsize = sess.run([raw_accuracy, batch_size_op], feed_dict)
+                accumulated_accuracy += accuracy_value * actual_bsize
+                logger.info('evaluation in progress: running accuracy = %.2f, processed = %d / %d',
+                            accuracy_value, (step - 1) * hyper.batch_size + actual_bsize, total_size)
+            duration = default_timer() - start_time
+            total_accuracy = accumulated_accuracy / total_size
+            logger.info('evaluation accumulated accuracy = %.2f%% (%.1f samples/sec; %.2f seconds)',
+                        total_accuracy * 100, actual_bsize / duration, duration)
+            logger.info('======================= Evaluation End =================================')
+            logger.info('')
+
+
+def main():
+    if hyper.evaluation:
+        do_evaluation()
+    else:
+        do_train()
 
 
 if __name__ == '__main__':

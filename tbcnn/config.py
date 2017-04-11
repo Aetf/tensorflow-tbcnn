@@ -24,7 +24,7 @@ class hyper(object):
     learning_rate = 0.00002  # learning rate
     weight_decay = 0.0002
     batch_size = 128
-    num_epochs = 50
+    num_epochs = 100
     # directories
     log_dir = '/tmp/workspace/tf_log'
     train_dir = '/tmp/workspace/tf_log'
@@ -49,7 +49,7 @@ class hyper(object):
                                 help='directory for tensorboard logs, defaults to WORK_DIR/logs')
             parser.add_argument('--train_dir',
                                 help='directory for model checkpoints, defaults to WORK_DIR/model')
-            parser.add_argument('--num_epochs', help='total number of epochs', type=int, default=50)
+            parser.add_argument('--num_epochs', help='total number of epochs', type=int, default=100)
             parser.add_argument('--batch_size', help='batch size', type=int, default=128)
             parser.add_argument('--learning_rate', help='learning rate', type=float, default=0.00002)
             parser.add_argument('--weight_decay', help='weight decay factor', type=float, default=0.0002)
@@ -63,6 +63,7 @@ class hyper(object):
                                 type=int, default=2)
             parser.add_argument('--node_type_num', help='total number of node types', type=int, default=20)
             parser.add_argument('--use_relu', type=bool, default=False)
+            parser.add_argument('--evaluation', help='Evaluating rather than training', type=bool, default=False)
             args = parser.parse_args()
             if not os.path.exists(args.work_dir):
                 os.makedirs(args.work_dir)
