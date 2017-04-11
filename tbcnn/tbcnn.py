@@ -213,6 +213,15 @@ def main():
     train_step = opt.minimize(loss, global_step=global_step)
 
     # Attach summaries
+    tf.summary.histogram('Wl', param.get('Wl'))
+    tf.summary.histogram('Wr', param.get('Wr'))
+    tf.summary.histogram('B', param.get('B'))
+    tf.summary.histogram('Wconvl', param.get('Wconvl'))
+    tf.summary.histogram('Wconvr', param.get('Wconvr'))
+    tf.summary.histogram('Wconvt', param.get('Wconvt'))
+    tf.summary.histogram('Bconv', param.get('Bconv'))
+    tf.summary.scalar('loss', loss)
+    tf.summary.scalar('val_accuracy', accuracy)
     summary_op = tf.summary.merge_all()
 
     # load data node to record
@@ -232,7 +241,7 @@ def main():
         ((n, 0) for n in nodes_valid[train_len[1]:val_len[1]])
     )
     # TODO: testing set
-    samples_test = itertools.chain(
+    samples_test = itertools.chain(  # noqa: F841
         ((n, 1) for n in nodes[val_len[0]:]),
         ((n, 0) for n in nodes_valid[val_len[1]:])
     )

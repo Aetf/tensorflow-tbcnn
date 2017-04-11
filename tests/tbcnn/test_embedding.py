@@ -38,7 +38,7 @@ class TestEmbedding(unittest.TestCase):
         self.sess.close()
 
     def _load_test_data(self):
-        nodes, word2int = data_load('data/tests.obj')
+        nodes, word2int = data_load('data/unittest.obj')
         return nodes[0], word2int
 
     def _get_leaf(self, root):

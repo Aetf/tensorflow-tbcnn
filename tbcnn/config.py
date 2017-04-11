@@ -10,10 +10,10 @@ import tensorflow as tf
 # Hyper parameters
 class hyper(object):
     # shapes
+    node_type_num = 40  # total number of node types
     word_dim = 40  # dimension of the feature vector for each node
     conv_dim = 40  # number of conv feature detectors
     fc_dim = 1024  # dimension of fc output
-    node_type_num = 20  # total number of node types
     output_dim = 2  # number of output classes
     # learning
     learning_rate = 0.0002  # learning rate

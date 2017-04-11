@@ -170,7 +170,11 @@ def write_embedding_metadata(writer, word2int):
             print(item[0], file=f)
 
     config = projector.ProjectorConfig()
-    config.model_checkpoint_dir = hyper.train_dir  # not work yet. TF doesn't support model_checkpoint_dir
+    config.model_checkpoint_dir = hyper.train_dir
+    # the above line not work yet. TF doesn't support model_checkpoint_dir
+    # thus create a symlink from train_dir to log_dir
+    os.symlink(os.path.join(hyper.train_dir, 'checkpoint'), os.path.join(hyper.log_dir, 'checkpoint'))
+
     embedding = config.embeddings.add()
     embedding.tensor_name = param.get('We').name
     # Link this tensor to its metadata file (e.g. labels).
@@ -180,7 +184,12 @@ def write_embedding_metadata(writer, word2int):
 
 
 def main():
-    hyper.initialize(variable_scope='embedding')
+    # load data early so we can initialize hyper parameters accordingly
+    nodes, word2int = data.load('data/nodes.obj')
+    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
+    nodes = nodes + nodes_valid
+
+    hyper.initialize(variable_scope='embedding', node_type_num=len(word2int))
 
     # create model variables
     param.initialize_embedding_weights()
@@ -203,11 +212,6 @@ def main():
     tf.summary.scalar('loss', loss)
 
     summary_op = tf.summary.merge_all()
-
-    # load data node to record
-    nodes, word2int = data.load('data/nodes.obj')
-    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
-    nodes = nodes + nodes_valid
 
     # create missing dir
     if not os.path.exists(hyper.train_dir):
