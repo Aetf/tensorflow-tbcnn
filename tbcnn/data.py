@@ -87,7 +87,7 @@ def _get_filename(basename, split):
     return '{}.{}.obj'.format(basename, split)
 
 
-def convert_to_stream_dataset(basename, train_frac=0.6, val_frac=0.6):
+def convert_to_stream_dataset(basename, train_frac=0.6, val_frac=0.2):
     nodes, word2int = load('data/raw/nodes.obj')
     nodes_valid, word2int = load('data/raw/valid_nodes.obj', word2int)
     random.shuffle(nodes)
