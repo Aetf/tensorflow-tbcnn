@@ -200,8 +200,7 @@ def main():
     tree_sum = tree_sum_blk(l2loss_blk)
     compiler = td.Compiler.create(tree_sum)
     (batched_loss, ) = compiler.output_tensors
-    loss = tf.reduce_mean(batched_loss) + tf.reduce_mean(tf.subtract(tf.norm(param.get('We'), axis=1),
-                                                                     hyper.embedding_norm))
+    loss = tf.reduce_mean(batched_loss)
     opt = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate)
 
     global_step = tf.Variable(0, trainable=False, name='global_step')
