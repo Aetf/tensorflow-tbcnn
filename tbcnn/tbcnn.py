@@ -316,7 +316,7 @@ def do_train():
             duration = default_timer() - start_time
             total_accuracy = accumulated_accuracy / total_size
             logger.info('validation acc = %.2f%% (%.1f samples/sec; %.2f seconds)',
-                        total_accuracy * 100, actual_bsize / duration, duration)
+                        total_accuracy * 100, total_size / duration, duration)
             saved_path = saver.save(sess, os.path.join(hyper.train_dir, "model.ckpt"), global_step=gstep)
             logger.info('validation saved path: %s', saved_path)
             logger.info('======================= Validation End =================================')
@@ -372,7 +372,7 @@ def do_evaluation():
             duration = default_timer() - start_time
             total_accuracy = accumulated_accuracy / total_size
             logger.info('evaluation accumulated accuracy = %.2f%% (%.1f samples/sec; %.2f seconds)',
-                        total_accuracy * 100, actual_bsize / duration, duration)
+                        total_accuracy * 100, total_size / duration, duration)
             logger.info('======================= Evaluation End =================================')
             logger.info('')
 
