@@ -189,10 +189,11 @@ def write_embedding_metadata(writer, word2int):
 
 
 def main():
+    apputil.initialize(variable_scope='embedding')
+
     # load data early so we can initialize hyper parameters accordingly
     ds = data.load_dataset('data/statements')
-
-    apputil.initialize(variable_scope='embedding', node_type_num=len(ds.word2int))
+    hyper.node_type_num = len(ds.word2int)
 
     # create model variables
     param.initialize_embedding_weights()

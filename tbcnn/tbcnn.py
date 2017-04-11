@@ -244,8 +244,7 @@ def train_with_val(unscaled_logits, batched_labels, train_accuracy):
 def do_train():
     # load data early to get node_type_num
     ds = data.load_dataset('data/statements')
-
-    apputil.initialize(variable_scope='tbcnn', node_type_num=len(ds.word2int))
+    hyper.node_type_num = len(ds.word2int)
 
     (compiler, unscaled_logits, logits, batched_labels,
      raw_accuracy, batch_size_op) = build_model()
@@ -327,11 +326,9 @@ def do_train():
 def do_evaluation():
     # load data early to get node_type_num
     ds = data.load_dataset('data/statements')
+    hyper.node_type_num = len(ds.word2int)
 
-    apputil.initialize(variable_scope='tbcnn', node_type_num=len(ds.word2int))
-
-    (compiler, _, _, _,
-     raw_accuracy, batch_size_op) = build_model()
+    (compiler, _, _, _, raw_accuracy, batch_size_op) = build_model()
 
     # restorer for embedding matrix
     embedding_path = tf.train.latest_checkpoint(hyper.embedding_dir)
@@ -381,6 +378,7 @@ def do_evaluation():
 
 
 def main():
+    apputil.initialize(variable_scope='tbcnn')
     if hyper.evaluation:
         do_evaluation()
     else:
