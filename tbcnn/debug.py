@@ -1,10 +1,10 @@
 # flake8: noqa
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-from .embedding import *
+from .tbcnn import *
 
 hyper.initialize()
-param.initialize_embedding_weights()
+param.initialize_tbcnn_weights()
 
 
 def find_leaf(root):
@@ -16,8 +16,8 @@ def find_leaf(root):
 sess = tf.InteractiveSession()
 sess.run(tf.global_variables_initializer())
 
-direct = direct_embed_blk()
-com = composed_embed_blk()
+direct = embedding.direct_embed_blk()
+com = embedding.composed_embed_blk()
 
 Wl = sess.run(param.get('Wl'))
 Wr = sess.run(param.get('Wr'))

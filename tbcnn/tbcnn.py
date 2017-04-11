@@ -74,8 +74,8 @@ def collect_node_for_conv_patch_blk(max_depth=2):
     return td.InputTransform(_collect_patch)
 
 
-def tri_combined_weight(idx, pclen, depth, max_depth):
-    """TF function, input: idx, depth as batch (1D Tensor)
+def tri_combined(idx, pclen, depth, max_depth):
+    """TF function, input: idx, pclen, depth, max_depth as batch (1D Tensor)
     Output: weight tensor (3D Tensor), first dim is batch
     """
     Wconvt = param.get('Wconvt')
@@ -89,7 +89,7 @@ def tri_combined_weight(idx, pclen, depth, max_depth):
     # when pclen == 1, replace nan items with 0.5
     tmp = tf.where(tf.is_nan(tmp), tf.ones_like(tmp) * 0.5, tmp)
 
-    t = (depth - 1) / (max_depth - 1)
+    t = (max_depth - depth) / max_depth
     r = (1 - t) * tmp
     l = (1 - t) * (1 - r)
 
@@ -108,7 +108,7 @@ def tri_combined_weight(idx, pclen, depth, max_depth):
 
 
 def tri_combined_blk():
-    blk = td.Function(tri_combined_weight, infer_output_type=False)
+    blk = td.Function(tri_combined, infer_output_type=False)
     blk.set_output_type(td.TensorType([hyper.word_dim, hyper.conv_dim]))
     return blk
 
@@ -272,7 +272,6 @@ def main():
 
         for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
             for step, batch in enumerate(td.group_by_batches(shuffled, hyper.batch_size), 1):
-                print('Batch is ', batch)
                 train_feed_dict = {compiler.loom_input_tensor: batch}
 
                 start_time = default_timer()

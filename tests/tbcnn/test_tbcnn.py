@@ -12,6 +12,16 @@ from tbcnn import tbcnn
 from tbcnn.data import load as data_load
 
 
+def tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt):
+    t = (max_depth - depth) / max_depth
+    if pclen == 1:
+        r = (1 - t) * 0.5
+    else:
+        r = (1 - t) * (idx - 1) / (pclen - 1)
+    l = (1 - t) * (1 - r)
+    return l * Wconvl + r * Wconvr + t * Wconvt
+
+
 @ddt
 class TestTbcnn(unittest.TestCase):
 
@@ -56,6 +66,23 @@ class TestTbcnn(unittest.TestCase):
         Wcomb2 = tbcnn.param.get('Wcomb2').eval(session=self.sess)
         desired = np.matmul(direct, Wcomb1) + np.matmul(com, Wcomb2)
 
+        nptest.assert_allclose(actual, desired)
+
+    @unpack
+    @data([1., 1., 0., 2.],
+          [1., 3., 1., 2.], [2., 3., 1., 2.], [3., 3., 1., 2.],
+          [1., 1., 2., 2.], [1., 3., 2., 2.], [2., 3., 2., 2.], [3., 3., 2., 2.],
+          [1., 2., 2., 2.], [2., 2., 2., 2.])
+    def test_tri_combined(self, idx, pclen, depth, max_depth):
+        """Test linear_combine_blk on data"""
+        Wconvl = self.sess.run(tbcnn.param.get('Wconvl'))
+        Wconvr = self.sess.run(tbcnn.param.get('Wconvr'))
+        Wconvt = self.sess.run(tbcnn.param.get('Wconvt'))
+
+        actual = (td.Scalar(), td.Scalar(), td.Scalar(), td.Scalar()) >> tbcnn.tri_combined_blk()
+        actual = actual.eval((idx, pclen, depth, max_depth), session=self.sess)
+
+        desired = tri_combined_np(idx, pclen, depth, max_depth, Wconvl, Wconvr, Wconvt)
         nptest.assert_allclose(actual, desired)
 
 
