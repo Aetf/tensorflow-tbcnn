@@ -21,6 +21,7 @@ class hyper(object):
     learning_rate = 0.0002  # learning rate
     batch_size = 128
     num_epochs = 50
+    embedding_norm = 1.
     # directories
     log_dir = '/tmp/workspace/tf_log'
     train_dir = '/tmp/workspace/tf_log'
@@ -58,6 +59,7 @@ class hyper(object):
                                 type=int, default=2)
             parser.add_argument('--node_type_num', help='total number of node types', type=int, default=20)
             parser.add_argument('--use_relu', type=bool, default=False)
+            parser.add_argument('--embedding_norm', type=float, default=1.)
             args = parser.parse_args()
             if not os.path.exists(args.work_dir):
                 os.makedirs(args.work_dir)
