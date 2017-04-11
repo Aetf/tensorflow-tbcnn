@@ -113,7 +113,9 @@ def composed_embed_blk():
         summed = td.Fold(continous_weighted_add_blk(), initial_state).reads(summed)[0]
         added = td.Function(tf.add, name='add_bias').reads(summed, td.FromTensor(param.get('B')))
         normed = clip_by_norm_blk().reads(added)
-        relu = td.Function(tf.nn.relu).reads(normed)
+
+        act_fn = tf.nn.relu if hyper.use_relu else tf.nn.tanh
+        relu = td.Function(act_fn).reads(normed)
         nonleaf_case.output.reads(relu)
 
     return td.OneOf(lambda node: node['clen'] == 0,
@@ -198,7 +200,7 @@ def main():
     tree_sum = tree_sum_blk(l2loss_blk)
     compiler = td.Compiler.create(tree_sum)
     (batched_loss, ) = compiler.output_tensors
-    loss = tf.reduce_mean(batched_loss)
+    loss = tf.reduce_mean(batched_loss) + tf.reduce_sum(tf.norm(param.get('We'), axis=1))
     opt = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate)
 
     global_step = tf.Variable(0, trainable=False, name='global_step')

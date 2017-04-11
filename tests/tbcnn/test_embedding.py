@@ -100,9 +100,13 @@ class TestEmbedding(unittest.TestCase):
             fc = embedding.direct_embed_blk().eval(c, session=self.sess)
             desired += np.matmul(fc, weight)
         desired += B
-        desired[desired < 0] = 0
 
-        nptest.assert_allclose(actual, desired)
+        if embedding.hyper.use_relu:
+            desired[desired < 0] = 0
+        else:
+            desired = np.tanh(desired)
+
+        nptest.assert_allclose(actual, desired, rtol=1e-6)
 
     def test_l2loss(self):
         root, _ = self._load_test_data()

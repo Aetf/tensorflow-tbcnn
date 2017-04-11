@@ -15,6 +15,8 @@ class hyper(object):
     conv_dim = 40  # number of conv feature detectors
     fc_dim = 1024  # dimension of fc output
     output_dim = 2  # number of output classes
+    # structure
+    use_relu = False
     # learning
     learning_rate = 0.0002  # learning rate
     batch_size = 128
@@ -55,6 +57,7 @@ class hyper(object):
                                 help='number of output classes, default to 2. Should not need to change',
                                 type=int, default=2)
             parser.add_argument('--node_type_num', help='total number of node types', type=int, default=20)
+            parser.add_argument('--use_relu', type=bool, default=False)
             args = parser.parse_args()
             if not os.path.exists(args.work_dir):
                 os.makedirs(args.work_dir)
