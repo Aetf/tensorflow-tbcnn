@@ -2,16 +2,19 @@ from __future__ import absolute_import, division, print_function
 
 import itertools
 import os
+import logging
 from timeit import default_timer
-from datetime import datetime
 
 import numpy as np
 import tensorflow as tf
 import tensorflow_fold as td
 
+from . import apputil
 from . import data
 from . import embedding
 from .config import hyper, param
+
+logger = logging.getLogger(__name__)
 
 
 def identity_initializer():
@@ -192,7 +195,7 @@ def main():
     nodes, word2int = data.load('data/nodes.obj')
     nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
 
-    hyper.initialize(variable_scope='tbcnn', node_type_num=len(word2int))
+    apputil.initialize(variable_scope='tbcnn', node_type_num=len(word2int))
 
     # create model variables
     param.initialize_tbcnn_weights()
@@ -276,9 +279,10 @@ def main():
 
         summary_writer = tf.summary.FileWriter(hyper.log_dir, graph=sess.graph)
 
-        #for epoch, shuffled in enumerate(td.epochs(val_set, hyper.num_epochs), 1):
-        for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
-            for step, batch in enumerate(td.group_by_batches(shuffled, hyper.batch_size), 1):
+        shuffled = zip(td.epochs(train_set, hyper.num_epochs),
+                       td.epochs(val_set, hyper.num_epochs))
+        for epoch, (train_shuffled, val_shuffled) in enumerate(shuffled, 1):
+            for step, batch in enumerate(td.group_by_batches(train_shuffled, hyper.batch_size), 1):
                 train_feed_dict = {compiler.loom_input_tensor: batch}
 
                 start_time = default_timer()
@@ -288,32 +292,31 @@ def main():
                                                  train_feed_dict)
                 duration = default_timer() - start_time
 
-                print('{}: global {} epoch {}, step {}, loss = {:.2f} ({:.1f} samples/sec; {:.3f} sec/batch)'
-                      .format(datetime.now(), gstep, epoch, step, loss_value,
-                              actual_bsize / duration, duration))
+                logger.info('global %d epoch %d step %d loss = %.2f (%.1f samples/sec; %.3f sec/batch)',
+                            gstep, epoch, step, loss_value, actual_bsize / duration, duration)
                 if gstep % 10 == 0:
                     summary_writer.add_summary(summary, gstep)
 
             # do a validation test
-            print('=========================== Validation ========================================')
+            logger.info('')
+            logger.info('======================= Validation ====================================')
             accumulated_accuracy = 0.
             total_size = 0
             start_time = default_timer()
-            for shuffled in td.epochs(val_set, 1):
-                for batch in td.group_by_batches(shuffled, hyper.batch_size):
-                    feed_dict = {compiler.loom_input_tensor: batch}
-                    accuracy_value, actual_bsize = sess.run([accuracy, batch_size_op], feed_dict)
-                    accumulated_accuracy += accuracy_value * actual_bsize
-                    total_size += actual_bsize
-                    print('{}: validation step, accuracy = {:.2f}, current batch = {}, processed = {}'
-                          .format(datetime.now(), accuracy_value, actual_bsize, total_size))
+            for batch in td.group_by_batches(val_shuffled, hyper.batch_size):
+                feed_dict = {compiler.loom_input_tensor: batch}
+                accuracy_value, actual_bsize = sess.run([accuracy, batch_size_op], feed_dict)
+                accumulated_accuracy += accuracy_value * actual_bsize
+                total_size += actual_bsize
+                logger.info('validation step, accuracy = %.2f, current batch = %d, processed = %d',
+                            accuracy_value, actual_bsize, total_size)
             duration = default_timer() - start_time
             total_accuracy = accumulated_accuracy / total_size
-            print('{}: validation acc = {:.2%} ({:.1f} samples/sec)'
-                  .format(datetime.now(), total_accuracy, actual_bsize / duration, duration))
+            logger.info('validation acc = %.2f%% (%.1f samples/sec)',
+                        total_accuracy * 100, actual_bsize / duration, duration)
             saved_path = saver.save(sess, os.path.join(hyper.train_dir, "model.ckpt"), global_step=gstep)
-            print('{}: validation saved path: {}'.format(datetime.now(), saved_path))
-            print('=========================== Validation End =====================================')
+            logger.info('validation saved path: %s', saved_path)
+            logger.info('======================= Validation End =================================\n')
 
 
 if __name__ == '__main__':

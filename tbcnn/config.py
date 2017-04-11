@@ -3,8 +3,11 @@ from builtins import (object)
 
 import os
 import argparse
+import logging
 
 import tensorflow as tf
+
+logger = logging.getLogger(__name__)
 
 
 # Hyper parameters

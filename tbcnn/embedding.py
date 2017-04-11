@@ -4,7 +4,7 @@ from builtins import open
 
 import os
 import operator
-from datetime import datetime
+import logging
 from timeit import default_timer
 
 import tensorflow as tf
@@ -12,7 +12,10 @@ import tensorflow_fold as td
 from tensorflow.contrib.tensorboard.plugins import projector
 
 from . import data
+from . import apputil
 from .config import hyper, param
+
+logger = logging.getLogger(__name__)
 
 
 def linear_combine(clen, pclen, idx):
@@ -191,7 +194,7 @@ def main():
     nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
     nodes = nodes + nodes_valid
 
-    hyper.initialize(variable_scope='embedding', node_type_num=len(word2int))
+    apputil.initialize(variable_scope='embedding', node_type_num=len(word2int))
 
     # create model variables
     param.initialize_embedding_weights()
@@ -236,9 +239,8 @@ def main():
                 _, loss_value, summary, gstep = sess.run([train_step, loss, summary_op, global_step], train_feed_dict)
                 duration = default_timer() - start_time
 
-                print('{}: global {} epoch {}, step {}, loss = {:.2f} ({:.1f} samples/sec; {:.3f} sec/batch)'
-                      .format(datetime.now(), gstep, epoch, step, loss_value,
-                              hyper.batch_size / duration, duration))
+                logger.info('global %d epoch %d step %d loss = %.2f (%.1f samples/sec; %.3f sec/batch)',
+                            gstep, epoch, step, loss_value, hyper.batch_size / duration, duration)
                 if gstep % 10 == 0:
                     summary_writer.add_summary(summary, gstep)
                 if gstep % 100 == 0:

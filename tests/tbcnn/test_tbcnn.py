@@ -41,7 +41,7 @@ class TestTbcnn(unittest.TestCase):
     def setUp(self):
         tf.reset_default_graph()
 
-        tbcnn.hyper.initialize(from_cmd=False, word_dim=3)
+        tbcnn.apputil.initialize(from_cmd=False, word_dim=3)
         tbcnn.param.initialize_tbcnn_weights()
 
         self.sess = tf.Session()

@@ -28,7 +28,7 @@ class TestEmbedding(unittest.TestCase):
     def setUp(self):
         tf.reset_default_graph()
 
-        embedding.hyper.initialize(from_cmd=False, word_dim=3)
+        embedding.apputil.initialize(from_cmd=False, word_dim=3)
         embedding.param.initialize_embedding_weights()
 
         self.sess = tf.Session()
