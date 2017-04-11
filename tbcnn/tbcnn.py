@@ -238,19 +238,18 @@ def main():
     val_frac = 0.2
     train_len = [int(train_frac * l) for l in [len(nodes), len(nodes_valid)]]
     val_len = [int(val_frac * l) for l in [len(nodes), len(nodes_valid)]]
-    print('Division: ', train_len, val_len)
     samples_train = itertools.chain(
         ((n, 1) for n in nodes[:train_len[0]]),
         ((n, 0) for n in nodes_valid[:train_len[1]])
     )
     samples_val = itertools.chain(
-        ((n, 1) for n in nodes[train_len[0]:val_len[0]]),
-        ((n, 0) for n in nodes_valid[train_len[1]:val_len[1]])
+        ((n, 1) for n in nodes[train_len[0]:train_len[0] + val_len[0]]),
+        ((n, 0) for n in nodes_valid[train_len[1]:train_len[1] + val_len[1]])
     )
     # TODO: testing set
     samples_test = itertools.chain(  # noqa: F841
-        ((n, 1) for n in nodes[val_len[0]:]),
-        ((n, 0) for n in nodes_valid[val_len[1]:])
+        ((n, 1) for n in nodes[train_len[0] + val_len[0]:]),
+        ((n, 0) for n in nodes_valid[train_len[1] + val_len[1]:])
     )
 
     # create missing dir
@@ -277,6 +276,7 @@ def main():
 
         summary_writer = tf.summary.FileWriter(hyper.log_dir, graph=sess.graph)
 
+        #for epoch, shuffled in enumerate(td.epochs(val_set, hyper.num_epochs), 1):
         for epoch, shuffled in enumerate(td.epochs(train_set, hyper.num_epochs), 1):
             for step, batch in enumerate(td.group_by_batches(shuffled, hyper.batch_size), 1):
                 train_feed_dict = {compiler.loom_input_tensor: batch}
@@ -293,13 +293,13 @@ def main():
                               actual_bsize / duration, duration))
                 if gstep % 10 == 0:
                     summary_writer.add_summary(summary, gstep)
+
             # do a validation test
             print('=========================== Validation ========================================')
             accumulated_accuracy = 0.
             total_size = 0
             start_time = default_timer()
             for shuffled in td.epochs(val_set, 1):
-                print('validation epoch start')
                 for batch in td.group_by_batches(shuffled, hyper.batch_size):
                     feed_dict = {compiler.loom_input_tensor: batch}
                     accuracy_value, actual_bsize = sess.run([accuracy, batch_size_op], feed_dict)
