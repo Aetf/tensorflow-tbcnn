@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 # Hyper parameters
 class hyper(object):
+    # operation
+    evaluation = False
     # shapes
     node_type_num = 40  # total number of node types
     word_dim = 40  # dimension of the feature vector for each node
