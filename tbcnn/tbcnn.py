@@ -188,7 +188,11 @@ def dynamic_pooling_blk():
 
 
 def main():
-    hyper.initialize(variable_scope='tbcnn')
+    # load data early to get node_type_num
+    nodes, word2int = data.load('data/nodes.obj')
+    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
+
+    hyper.initialize(variable_scope='tbcnn', node_type_num=len(word2int))
 
     # create model variables
     param.initialize_tbcnn_weights()
@@ -197,12 +201,16 @@ def main():
     tree_pooling = dynamic_pooling_blk()
     compiler = td.Compiler.create((tree_pooling, td.Scalar(dtype='int32')))
     (pooled, batched_labels) = compiler.output_tensors
+
+    print('pooled shape', pooled.get_shape())
+    print('batched_label shape', batched_labels.get_shape())
+
     fc1 = tf.nn.relu(tf.add(tf.matmul(pooled, param.get('FC1/weight')), param.get('FC1/bias')))
     fc2 = tf.nn.relu(tf.add(tf.matmul(fc1, param.get('FC2/weight')), param.get('FC2/bias')))
 
     # our prediction output with accuracy calc
     logits = tf.nn.softmax(fc2)
-    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(batched_labels, 1))
+    correct_prediction = tf.equal(tf.argmax(logits, 1), batched_labels)
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     batch_size_op = tf.unstack(tf.shape(batched_labels))[0]
 
@@ -226,10 +234,9 @@ def main():
     tf.summary.scalar('val_accuracy', accuracy)
     summary_op = tf.summary.merge_all()
 
-    # load data node to record
-    nodes, word2int = data.load('data/nodes.obj')
-    nodes_valid, word2int = data.load('data/valid_nodes.obj', word2int)
-    # divide into training and validation and testing
+    # divide into training and validation and testing, and pair with label
+    # label 1 means injection statement
+    # label 0 means innocent statement
     train_frac = 0.6
     val_frac = 0.2
     train_len = [int(train_frac * l) for l in [len(nodes), len(nodes_valid)]]
