@@ -22,6 +22,7 @@ class hyper(object):
     use_relu = False
     # learning
     learning_rate = 0.0002  # learning rate
+    weight_decay = 0.002
     batch_size = 128
     num_epochs = 50
     # directories
@@ -51,6 +52,7 @@ class hyper(object):
             parser.add_argument('--num_epochs', help='total number of epochs', type=int, default=50)
             parser.add_argument('--batch_size', help='batch size', type=int, default=128)
             parser.add_argument('--learning_rate', help='learning rate', type=float, default=0.0002)
+            parser.add_argument('--weight_decay', help='weight decay factor', type=float, default=0.002)
             parser.add_argument('--word_dim', help='dimension of node feature', type=int, default=100)
             parser.add_argument('--conv_dim',
                                 help='dimension of conv feature detectors', type=int, default=50)

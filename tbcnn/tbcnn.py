@@ -214,9 +214,15 @@ def main():
     accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     batch_size_op = tf.unstack(tf.shape(batched_labels))[0]
 
+    # calculate weight decay loss
+    decay_names = ['Wl', 'Wr', 'Wconvl', 'Wconvr', 'Wconvt']
+    decay_loss = tf.reduce_sum(
+        input_tensor=hyper.weight_decay * tf.stack([tf.nn.l2_loss(param.get(n)) for n in decay_names]),
+        name='weights_norm')
+
     # Calculate loss and apply optimizer
     batched_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=fc2, labels=batched_labels)
-    loss = tf.reduce_mean(batched_loss)
+    loss = tf.reduce_mean(batched_loss) + decay_loss
     opt = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate)
 
     global_step = tf.Variable(0, trainable=False, name='global_step')
@@ -231,12 +237,13 @@ def main():
     tf.summary.histogram('Wconvt', param.get('Wconvt'))
     tf.summary.histogram('Bconv', param.get('Bconv'))
     tf.summary.scalar('loss', loss)
-    tf.summary.scalar('val_accuracy', accuracy)
     summary_op = tf.summary.merge_all()
+
+    val_summary_op = tf.summary.scalar('val_accuracy', accuracy)
 
     # divide into training and validation and testing, and pair with label
     # label 1 means injection statement
-    # label 0 means innocent statement
+    # label 0 means benign statement
     train_frac = 0.6
     val_frac = 0.2
     train_len = [int(train_frac * l) for l in [len(nodes), len(nodes_valid)]]
@@ -279,6 +286,7 @@ def main():
 
         summary_writer = tf.summary.FileWriter(hyper.log_dir, graph=sess.graph)
 
+        val_step_counter = 0
         shuffled = zip(td.epochs(train_set, hyper.num_epochs),
                        td.epochs(val_set, hyper.num_epochs))
         for epoch, (train_shuffled, val_shuffled) in enumerate(shuffled, 1):
@@ -298,15 +306,19 @@ def main():
                     summary_writer.add_summary(summary, gstep)
 
             # do a validation test
-            logger.info('\n======================= Validation ====================================')
+            logger.info('')
+            logger.info('======================= Validation ====================================')
             accumulated_accuracy = 0.
             total_size = 0
             start_time = default_timer()
             for batch in td.group_by_batches(val_shuffled, hyper.batch_size):
                 feed_dict = {compiler.loom_input_tensor: batch}
-                accuracy_value, actual_bsize = sess.run([accuracy, batch_size_op], feed_dict)
+                accuracy_value, actual_bsize, val_summary = sess.run([accuracy, batch_size_op,
+                                                                      val_summary_op], feed_dict)
+                summary_writer.add_summary(val_summary, val_step_counter)
                 accumulated_accuracy += accuracy_value * actual_bsize
                 total_size += actual_bsize
+                val_step_counter += 1
                 logger.info('validation step, accuracy = %.2f, current batch = %d, processed = %d',
                             accuracy_value, actual_bsize, total_size)
             duration = default_timer() - start_time
@@ -315,7 +327,8 @@ def main():
                         total_accuracy * 100, actual_bsize / duration, duration)
             saved_path = saver.save(sess, os.path.join(hyper.train_dir, "model.ckpt"), global_step=gstep)
             logger.info('validation saved path: %s', saved_path)
-            logger.info('======================= Validation End =================================\n')
+            logger.info('======================= Validation End =================================')
+            logger.info('')
 
 
 if __name__ == '__main__':
