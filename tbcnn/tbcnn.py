@@ -211,22 +211,30 @@ def build_model():
 
 
 def train_with_val(unscaled_logits, batched_labels, train_accuracy):
+    global_step = tf.Variable(0, trainable=False, name='global_step')
+
     # calculate weight decay loss
     decay_names = ['Wl', 'Wr', 'Wconvl', 'Wconvr', 'Wconvt']
     decay_loss = tf.reduce_sum(
         input_tensor=hyper.weight_decay * tf.stack([tf.nn.l2_loss(param.get(n)) for n in decay_names]),
         name='weights_norm')
 
-    # Calculate loss and apply optimizer
+    # Calculate loss
     batched_loss = tf.nn.sparse_softmax_cross_entropy_with_logits(logits=unscaled_logits,
                                                                   labels=batched_labels)
     loss = tf.reduce_mean(batched_loss) + decay_loss
-    opt = tf.train.AdamOptimizer(learning_rate=hyper.learning_rate)
 
-    global_step = tf.Variable(0, trainable=False, name='global_step')
+    # Exponential decay learning rate
+    decayed_rate = tf.train.exponential_decay(hyper.learning_rate, global_step,
+                                              200, 0.65, staircase=True)
+    opt = tf.train.AdamOptimizer(learning_rate=decayed_rate)
+
+    # Apply optimizer
     train_step = opt.minimize(loss, global_step=global_step)
 
     # Attach summaries
+    tf.summary.scalar('learning_rate', decayed_rate)
+
     tf.summary.histogram('Wl', param.get('Wl'))
     tf.summary.histogram('Wr', param.get('Wr'))
     tf.summary.histogram('B', param.get('B'))
