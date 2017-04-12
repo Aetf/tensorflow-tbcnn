@@ -195,6 +195,8 @@ def main():
     ds = data.load_dataset('data/statements')
     hyper.node_type_num = len(ds.word2int)
 
+    hyper.dump()
+
     # create model variables
     param.initialize_embedding_weights()
 

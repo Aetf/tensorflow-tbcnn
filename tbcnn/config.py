@@ -35,6 +35,12 @@ class hyper(object):
     variable_scope = ''
 
     @classmethod
+    def dump(clz):
+        d = {k: v for k, v in vars(clz).items() if not k.startswith('__')}
+        with open(os.path.join(clz.work_dir, 'params.txt')) as f:
+            print(d, file=f)
+
+    @classmethod
     def initialize(clz, from_cmd=True, **kwargs):
         if from_cmd:
             parser = argparse.ArgumentParser()

@@ -254,6 +254,8 @@ def do_train():
     ds = data.load_dataset('data/statements')
     hyper.node_type_num = len(ds.word2int)
 
+    hyper.dump()
+
     (compiler, unscaled_logits, logits, batched_labels,
      raw_accuracy, batch_size_op) = build_model()
 
