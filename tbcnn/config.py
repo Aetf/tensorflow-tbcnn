@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 class hyper(object):
     # operation
     evaluation = False
+    warm_up = False
     # shapes
     node_type_num = 40  # total number of node types
     word_dim = 40  # dimension of the feature vector for each node
@@ -59,7 +60,7 @@ class hyper(object):
                                 help='directory for model checkpoints, defaults to WORK_DIR/model')
             parser.add_argument('--num_epochs', help='total number of epochs', type=int, default=100)
             parser.add_argument('--batch_size', help='batch size', type=int, default=128)
-            parser.add_argument('--learning_rate', help='learning rate', type=float, default=0.00002)
+            parser.add_argument('--learning_rate', help='learning rate', type=float, default=0.0002)
             parser.add_argument('--weight_decay', help='weight decay factor', type=float, default=0.0002)
             parser.add_argument('--word_dim', help='dimension of node feature', type=int, default=100)
             parser.add_argument('--conv_dim',
@@ -72,6 +73,8 @@ class hyper(object):
             parser.add_argument('--node_type_num', help='total number of node types', type=int, default=20)
             parser.add_argument('--use_relu', type=bool, default=False)
             parser.add_argument('--evaluation', help='Evaluating rather than training', action='store_true')
+            parser.add_argument('--warm_up', help='Do warming_up before evaluation, used for timing',
+                                action='store_true')
             args = parser.parse_args()
             if not os.path.exists(args.work_dir):
                 os.makedirs(args.work_dir)

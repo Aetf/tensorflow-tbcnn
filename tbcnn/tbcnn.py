@@ -368,7 +368,8 @@ def do_evaluation():
         gvariables = [v for v in tf.global_variables() if v not in tf.get_collection('restored')]
         sess.run(tf.variables_initializer(gvariables))
 
-        for shuffled in td.epochs(test_set, 1):
+        num_epochs = 1 if not hyper.warm_up else 3
+        for shuffled in td.epochs(test_set, num_epochs):
             logger.info('')
             logger.info('======================= Evaluation ====================================')
             accumulated_accuracy = 0.
