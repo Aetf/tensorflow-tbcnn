@@ -37,7 +37,7 @@ class hyper(object):
     @classmethod
     def dump(clz):
         d = {k: v for k, v in vars(clz).items() if not k.startswith('__')}
-        with open(os.path.join(clz.work_dir, 'params.txt')) as f:
+        with open(os.path.join(clz.work_dir, 'params.txt'), 'w') as f:
             print(d, file=f)
 
     @classmethod
